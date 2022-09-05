@@ -1,0 +1,13 @@
+name: EmocionesApp
+title: EmocionesApp
+username:
+account: florecimientohumanotec
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6800421
+bundleId: 6268585
+url: https://florecimientohumanotec.shinyapps.io/EmocionesApp/
+when: 1662348400.19405
+lastSyncTime: 1662348400.19408
+asMultiple: FALSE
+asStatic: FALSE
