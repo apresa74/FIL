@@ -12,6 +12,7 @@ options(gargle_oauth_cache = "secrets",
 
 gs4_auth()
 
+Sys.setenv(TZ='America/Mexico_City')
 
 Libros <- read_sheet("1BrkZeStaYAuidjxQZO2LhnJ2a36n3USksJYiUBtXe8g",
                     sheet = "Poniatowska_Libros") %>% select(Titulo)
@@ -83,7 +84,7 @@ ui <- fluidPage(
            ),
       column(12, id="footer",
              HTML("<br><br>Las emociones en Elena Poniatowska es un proyecto del Seminario de Humanidades digitales del Tecnologico de Monterrey.
-              Ha sido desarollado por <a href='https://github.com/mancebral/Flourishing-Measure'>cebral-loureda en R programming</a>
+              Ha sido desarollado por <a href='https://github.com/mancebral/Flourishing-Measure'>Cebral-Loureda en R programming</a>
             con licencia <a rel='license' href='http://creativecommons.org/licenses/by-nc/4.0/'>Creative Commons Attribution-NonCommercial 4.0 International License</a>.<br><br>
             <a rel='license' href='http://creativecommons.org/licenses/by-nc/4.0/'><img alt='Creative Commons License' style='border-width:0' src='https://i.creativecommons.org/l/by-nc/4.0/88x31.png' /></a>
               <br><br>"))
@@ -98,12 +99,6 @@ server <- function(input, output) {
       sheet_append(., ss="1BrkZeStaYAuidjxQZO2LhnJ2a36n3USksJYiUBtXe8g",
                    sheet = "data")
     })
-
-  update_data <- reactive ({
-    tibble (input$libros, input$emociones, c(input$p1, input$p2, input$p3), Sys.time()) %>%
-      sheet_append(., ss="1BrkZeStaYAuidjxQZO2LhnJ2a36n3USksJYiUBtXe8g",
-                   sheet = "data")
-  })
   
   observeEvent(input$send, {
     output$texto <- renderText({
