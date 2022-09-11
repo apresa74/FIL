@@ -106,6 +106,14 @@ server <- function(input, output) {
       Consulta los resultados en tiempo real en el stand de Humanidades digitales de la FILMTY 2022."
     })
   })
+        
+   disable("send")
+  
+  observe({
+    shinyjs::toggleState("send", !((input$libros=="-Selecciona una opción-")|
+                                        (input$emociones=="-Selecciona una opción-")|
+                                        (input$p1=="")))
+  })
     
 }
     
