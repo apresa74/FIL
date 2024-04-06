@@ -23,12 +23,12 @@ Sys.setenv(TZ='America/Mexico_City')
 IsThereNewRow=function(){  #  cheap function whose values over time will be tested for equality;
   #  inequality indicates that the underlying value has changed and needs to be 
   #  invalidated and re-read using valueFunc
-  read_sheet("1BrkZeStaYAuidjxQZO2LhnJ2a36n3USksJYiUBtXe8g",
+  read_sheet("XXXXXXXX",
                           sheet = "data") %>% nrow()
 }
 
 ReadAllData=function(){ # A function that calculates the underlying value
-  read_sheet("1BrkZeStaYAuidjxQZO2LhnJ2a36n3USksJYiUBtXe8g",
+  read_sheet("XXXXXXXX",
              sheet = "data")
 }
 
