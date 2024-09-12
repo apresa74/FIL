@@ -3,6 +3,8 @@ library(shiny)
 library(tidyverse)
 library(ggiraph)
 library(ggimage)
+library(ggraph)
+library(tidygraph)
 #library(wordcloud2)
 library(shinycssloaders)
 
