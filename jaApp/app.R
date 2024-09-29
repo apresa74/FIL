@@ -7,17 +7,23 @@ library(ggiraph)
 library(tidygraph)
 library(ggraph)
 library(shinythemes)
-
+library(plotly)
+library(shinyWidgets)
 
 captionsTotal <- readRDS("data/captionsTotalParagraphs.rds")
 videoIds <- readRDS("data/videoIds.rds")
 jatopics <- readRDS("data/jatopics.rds")
+jagamma <- readRDS("data/jagamma.rds")
 
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
-  useShinyjs(), 
+  useShinyjs(),
+  
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "stylesheet.css")
+  ),
   
   # Footer
   tags$footer(
@@ -29,47 +35,72 @@ ui <- fluidPage(
          '
     )),
   
+  tags$head(tags$style("#miParrafo{font-size: 10px;
+                                 font-style: italic;
+                                 }"
+  )
+  ),
+  
   theme = shinytheme("cerulean"),
     # Application title
 
     # Sidebar with a slider input for number of bins 
-    column(5,
+    column(6,
          column(12,
                 titlePanel("El Multiverso de José Agustín"),
-                
-          HTML("Haz click en los nodos para visualizar fragmentos de video de José Agustín vinculados con esas palabras. 
+                radioGroupButtons(
+                  inputId = "general",
+                  label = "",
+                  choices = c("Grafo", 
+                              "Texto libre"),
+                  justified = TRUE
+                ),
+                conditionalPanel(
+                  condition = 'input.general=="Grafo"',
+                  HTML("Haz click en los nodos para visualizar fragmentos de video vinculados con esas palabras. 
                También puedes variar el tamaño de la red así como enfocarte en alguno de los tópicos 
                mediante los controles de abajo.<br><br>"),
+          column(6,
             checkboxGroupInput("topics", inline = TRUE,
-                        "Escoje un tópico:",
+                        "Escoje uno o varios tópicos:",
                        choices = c("LITERATURA"="1", "MEXICO"="2", "FAMILIA"="3", "ROCK"="4",
                                    "ESCRITOR"="5", "VIDA"="6"),
                        selected = c("LITERATURA"="1", "MEXICO"="2", "FAMILIA"="3", "ROCK"="4",
-                                    "ESCRITOR"="5", "VIDA"="6")),
+                                    "ESCRITOR"="5", "VIDA"="6"))),
+          column(6,
            # wordcloud2Output("nube")
-          #textInput("myText", "Introduce una o varias palabras sobre las que quieras encontrar videos"),
-          sliderInput("rango", label = "Rango de la red", min = 5, max = 50, value = 10)
+          sliderInput("rango", label = "Rango de la red", min = 5, max = 50, value = 10)#,
         ),
         column(12,
-               htmlOutput("video")%>% withSpinner(),
-               actionButton("siguiente", "Otro video →"),
-               HTML("<br>"),
-               textOutput("miParrafo"))
-        ),
+               girafeOutput("graph")%>% withSpinner()
+              )),
+        conditionalPanel(
+          condition = "input.general=='Texto libre'",
+          textInput("myText", "Introduce una o varias palabras sobre las que quieras encontrar videos"),
+          actionButton("buscar", "Buscar correlaciones")
+        )
+        )),
 
         # Show a plot of the generated distribution
-        column(7,
-           girafeOutput("graph")%>% withSpinner(),
-           #verbatimTextOutput("test"),
-           HTML("<br><br><br>")
-        )
+        column(6, 
+               id="myCanvas",
+               #style = "height: 100vh;",
+               htmlOutput("video")%>% withSpinner(),
+               HTML("<br>"),
+               actionButton("siguiente", "Otro video →"),
+               HTML("<br><br>"),
+               textOutput("miParrafo"),
+               plotlyOutput("gammaValues", height = 200),
+           HTML("<br><br><br>"))
 )
 
-# Define server logic required to draw a histogram
+# Define server logic required
 server <- function(input, output, session) {
   
   hide("siguiente")
-  
+  hide("video")
+  hide("miParrafo")
+
   counter <- reactiveValues(countervalue = 1) # Defining & initializing the reactiveValues object
   
   observeEvent(input$siguiente, {
@@ -85,23 +116,44 @@ server <- function(input, output, session) {
     return(intersection / union)
   }
   
-  # query_words <- reactive({input$myText %>%  as_tibble() %>% 
-  #     unnest_tokens(words, value) %>% pull(words)
-  # })
-  query_words <- reactive(tail(input$graph_selected,1))
+  query <- reactiveValues(words="incio")
+  similarities <- reactiveValues(value="incio")
+  
+  observeEvent(input$graph_selected, {
+    query$words <- tail(input$graph_selected,1)
+    
+  })
+  
+  observeEvent(input$buscar, {
+    query$words <- input$myText %>%  as_tibble() %>%
+        unnest_tokens(words, value) %>% pull(words)
+  })
   
   # Calculate Jaccard similarity for each paragraph
-  similarities <- eventReactive(input$graph_selected, {
-    updateActionButton(session, "siguiente", label = paste0("Otro video relacionado con ", query_words()," →"))
-    show("siguiente")
+  observeEvent(input$graph_selected, {
+      updateActionButton(session, "siguiente", label = paste0("Otro video relacionado con ", query$words," →"))
+      delay(3000, show("siguiente"))
+      delay(3000, show("video"))
+      delay(3000, show("miParrafo"))
+      
+      similarities$value <- sapply(captionsTotal$parrafo, function(paragraph) {
+        paragraph_words <- unlist(strsplit(paragraph, " "))
+        jaccard_similarity(query$words, paragraph_words)}
+      )})
+  
+  observeEvent(input$buscar, {
+    updateActionButton(session, "siguiente", label = paste0("Otro video relacionado con ", query$words," →"))
+    delay(3000, show("siguiente"))
+    delay(3000, show("video"))
+    delay(3000, show("miParrafo"))
     
-    sapply(captionsTotal$parrafo, function(paragraph) {
+    similarities$value <- sapply(captionsTotal$parrafo, function(paragraph) {
       paragraph_words <- unlist(strsplit(paragraph, " "))
-      jaccard_similarity(query_words(), paragraph_words)}
+      jaccard_similarity(query$words, paragraph_words)}
     )})
   
   similares <- reactive(captionsTotal %>% 
-    filter(parrafo%in% names(tail(sort(similarities()),5)))
+    filter(parrafo%in% names(tail(sort(similarities$value),5)))
   )
   
   output$graph <- renderGirafe({
@@ -111,7 +163,6 @@ server <- function(input, output, session) {
         slice_max(order_by = beta, n = input$rango) %>%
         as_tbl_graph() %>%
         activate(nodes) %>%
-        #left_join(videoIds, by = c("name"="vid")) %>%
         mutate(name=if_else(name=="1", "LITERATURA",
                             if_else(name=="2", "MEXICO",
                                     if_else(name=="3", "FAMILIA",
@@ -126,8 +177,8 @@ server <- function(input, output, session) {
         geom_node_label(aes(label=if_else(name%in%c("LITERATURA", "MEXICO", "FAMILIA",
                                                          "ROCK", "ESCRITOR", "VIDA"), name, NA)))+
         theme_void()
-
-      girafe(ggobj = jaGraph, width_svg = 5, height_svg = 5,
+      
+      girafe(ggobj = jaGraph, width_svg = 5, height_svg = 4,
                             options = list(opts_sizing(rescale = TRUE),
                                            opts_selection(type = "single", only_shiny = FALSE,
                                                           css = "fill:transparent;stroke:transparent;r:5pt;"),
@@ -136,19 +187,40 @@ server <- function(input, output, session) {
     })
   
   output$miParrafo <- renderText(print(similares()$parrafo[counter$countervalue]))
-  
-  #output$test <- renderPrint(print(similares()))
-  
     
-    output$video <- renderUI(
-      HTML(paste0('<iframe width="100%" height="500" src="https://www.youtube.com/embed/',
-                  similares()$vid[counter$countervalue], '?autoplay=1&start=', round(similares()$start[counter$countervalue], 0), '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>'))
-
+  output$video <- renderUI(
+      HTML(paste0('<div class="video-container"><iframe width="100%" src="https://www.youtube.com/embed/',
+                  similares()$vid[counter$countervalue], '?autoplay=1&start=', round(similares()$start[counter$countervalue], 0), '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                  </div>'))
     )
+  
     
+    observeEvent(input$graph_selected, {
+      output$gammaValues <- renderPlotly({
+        tempPlot <- jagamma %>%
+          filter(similares()$vid[counter$countervalue]==document) %>%
+          mutate(topic=reorder(as_factor(topic), gamma)) %>% 
+          group_by(topic) %>% 
+          filter(row_number()==1) %>% 
+          ungroup() %>% 
+          distinct() %>% 
+          ggplot(aes(gamma, topic))+
+          geom_col(fill="#ff0000")+
+          geom_col(aes(1, topic), color="black", fill= "transparent", show.legend = FALSE)+
+          ylab(NULL)+
+          xlab(NULL)+
+          ggtitle("Vinculación del video con los tópicos")+
+          theme_minimal()
+        
+        ggplotly(tempPlot)%>% 
+          config(displayModeBar = FALSE) %>% 
+          layout(xaxis=list(fixedrange=TRUE)) %>% 
+          layout(yaxis=list(fixedrange=TRUE))
+        
+        })
+    })
     
     }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
